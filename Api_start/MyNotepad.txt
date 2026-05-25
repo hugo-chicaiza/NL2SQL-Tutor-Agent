@@ -1,0 +1,14 @@
+----------- Inicializar servicions venv
+cd ~/TrainingSQL/api
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+agregar venv a .dockerignore
+which python
+cambiar de interprete
+
+----------- run in venv
+python -m app.test_connection
+
+docker exec -it sql_agent_api bash

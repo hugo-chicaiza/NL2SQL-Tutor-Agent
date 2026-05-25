@@ -1,0 +1,12 @@
+# Entornos virtuales y caché
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Variables de entorno con credenciales y contraseñas (¡Súper importante!)
+.env
+
+# Archivos ocultos de VS Code o el sistema
+.vscode/
+.DS_Store
