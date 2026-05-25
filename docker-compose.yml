@@ -1,0 +1,67 @@
+name: training_sql
+
+networks:
+  data_net:
+    driver: bridge
+
+volumes:
+  training_pg_data:
+
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: training_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      
+    ports:
+      - "${POSTGRES_PORT}:5432"
+
+    volumes:
+      - training_pg_data:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d
+
+    networks:
+      - data_net
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./Api_start
+    container_name: sql_agent_api
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 256m
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${API_PORT}:8000"
+    volumes:
+      - ./Api_start:/app
+    
+    networks:
+      - data_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+
