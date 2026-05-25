@@ -11,3 +11,4 @@ cambiar de interprete
 ----------- run in venv
 python -m app.test_connection
 
+docker exec -it sql_agent_api bash

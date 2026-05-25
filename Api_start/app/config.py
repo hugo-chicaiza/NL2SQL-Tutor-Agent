@@ -7,10 +7,10 @@ class Settings(BaseSettings):
     postgres_user: str
     postgres_password: str
     postgres_db: str
-    api_port: int
     
     class Config:
-        env_file = ".env"
+        env_file = ".env",
+        extra="ignore"
 
 
 settings = Settings()
