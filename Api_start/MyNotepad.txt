@@ -9,6 +9,13 @@ which python
 cambiar de interprete
 
 ----------- run in venv
-python -m app.test_connection
+python -m app.temporal_testing
+
+SQL_ECHO=false python -m app.ttemporal_testing
 
 docker exec -it sql_agent_api bash
+
+
+Superuser DB trainer trainer
+user read ai_reader ai_pass
+

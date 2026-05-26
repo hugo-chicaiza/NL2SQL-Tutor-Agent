@@ -1,0 +1,59 @@
+-- =========================================================
+-- ROLE: ai_reader (solo lectura)
+-- =========================================================
+CREATE ROLE ai_reader LOGIN PASSWORD 'ai_pass';
+
+-- =========================================================
+-- ROLE: ai_writer (LLM semantic writer)
+-- =========================================================
+CREATE ROLE ai_writer LOGIN PASSWORD 'ai_pass';
+
+-- =========================================================
+-- SCHEMA CONTEXT
+-- =========================================================
+CREATE SCHEMA IF NOT EXISTS context;
+
+-- =========================================================
+-- TABLE: semantic_tables
+-- =========================================================
+CREATE TABLE IF NOT EXISTS context.semantic_tables (
+    schema_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (schema_name, table_name)
+);
+
+-- =========================================================
+-- TABLE: semantic_columns
+-- =========================================================
+CREATE TABLE IF NOT EXISTS context.semantic_columns (
+    schema_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    column_name TEXT NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (schema_name, table_name, column_name)
+);
+
+-- =========================================================
+-- PERMISSIONS CONTROLLED ACCESS
+-- =========================================================
+
+REVOKE ALL ON SCHEMA context FROM PUBLIC;
+
+GRANT USAGE ON SCHEMA context TO ai_reader;
+GRANT USAGE ON SCHEMA context TO ai_writer;
+
+-- reader: read only
+GRANT SELECT ON ALL TABLES IN SCHEMA context TO ai_reader;
+
+-- writer: can modify semantic data (LLM)
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA context TO ai_writer;
+
+-- future tables auto permissions
+ALTER DEFAULT PRIVILEGES IN SCHEMA context
+GRANT SELECT ON TABLES TO ai_reader;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA context
+GRANT SELECT, INSERT, UPDATE ON TABLES TO ai_writer;
