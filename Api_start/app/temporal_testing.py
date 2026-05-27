@@ -170,7 +170,7 @@ async def main():
 
             print(
                 f"[2] Extracted "
-                f"{len(tables)} tables"
+                #f"{len(tables)} tables"
             )
 
             # =============================================
@@ -208,7 +208,7 @@ async def main():
 
             print(
                 f"[4] Extracted "
-                f"{len(relationships)} relationships"
+                #f"{len(relationships)} relationships"
             )
 
             # =============================================

@@ -196,7 +196,7 @@ class SQLGenerator:
             )
         )
 
-        sql = llm_response["sql"]
+        sql = self._format_sql(llm_response["sql"])
 
         explanation = (
             llm_response["explanation"]
@@ -364,3 +364,29 @@ class SQLGenerator:
 
             "llm_time": llm_time
         }
+
+    def _format_sql(self, sql: str) -> str:
+        """
+        Formats SQL into readable multi-line structure.
+        Lightweight formatter (no external libs).
+        """
+
+        keywords = [
+            "SELECT", "FROM", "WHERE", "JOIN",
+            "INNER JOIN", "LEFT JOIN", "RIGHT JOIN",
+            "GROUP BY", "ORDER BY", "LIMIT", "HAVING"
+        ]
+
+        formatted = sql
+
+        # Normalize spacing
+        formatted = formatted.replace(",", ", ")
+
+        # Break lines before keywords
+        for kw in keywords:
+            formatted = formatted.replace(kw, f"\n{kw}")
+
+        # Clean multiple spaces/newlines
+        lines = [line.strip() for line in formatted.split("\n") if line.strip()]
+
+        return "\n".join(lines)
