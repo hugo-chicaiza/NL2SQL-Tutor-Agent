@@ -70,31 +70,61 @@ class SchemaGraph:
 class SchemaGraphBuilder:
 
     @staticmethod
-    def build(relationships: List[RelationshipInfo]) -> SchemaGraph:
+    def build(
+        relationships: List[RelationshipInfo]
+    ) -> SchemaGraph:
 
         adjacency = defaultdict(set)
+
         reverse_adjacency = defaultdict(set)
+
         edges = []
 
         for rel in relationships:
 
-            src = rel.source_table
-            tgt = rel.target_table
+            src = (
+                f"{rel.source_schema}."
+                f"{rel.source_table}"
+            )
+
+            tgt = (
+                f"{rel.target_schema}."
+                f"{rel.target_table}"
+            )
 
             adjacency[src].add(tgt)
+
             adjacency[tgt].add(src)
+
             reverse_adjacency[tgt].add(src)
 
             edges.append({
+
                 "source_table": src,
+
                 "target_table": tgt,
-                "source_column": rel.source_column,
-                "target_column": rel.target_column,
-                "constraint": rel.constraint_name,
+
+                "source_column":
+                    rel.source_column,
+
+                "target_column":
+                    rel.target_column,
+
+                "constraint":
+                    rel.constraint_name,
             })
 
         return SchemaGraph(
-            adjacency={k: list(v) for k, v in adjacency.items()},
-            reverse_adjacency={k: list(v) for k, v in reverse_adjacency.items()},
+
+            adjacency={
+                k: list(v)
+                for k, v in adjacency.items()
+            },
+
+            reverse_adjacency={
+                k: list(v)
+                for k, v in reverse_adjacency.items()
+            },
+
             edges=edges,
         )

@@ -19,3 +19,9 @@ docker exec -it sql_agent_api bash
 Superuser DB trainer trainer
 user read ai_reader ai_pass
 
+
+
+sudo apt update && sudo apt install tree -y
+
+tree /home/matthew/TrainingSQL/Api_start -I '__pycache__|venv|.venv|env|.git' > /home/matthew/TrainingSQL/Api_start/arbol_proyecto.txt
+

@@ -1,0 +1,36 @@
+/home/matthew/TrainingSQL/Api_start
+├── MyNotepad.txt
+├── PSQL_User.txt
+├── app
+│   ├── cache
+│   ├── config.py
+│   ├── context
+│   │   └── context_builder.py
+│   ├── core
+│   │   ├──  prompt_builder.py
+│   │   ├── executor.py
+│   │   ├── planner.py
+│   │   ├── sql_generator.py
+│   │   └── validator.py
+│   ├── db
+│   │   └── database.py
+│   ├── graph
+│   │   ├── inner_graph.py
+│   │   └── schema_graph.py
+│   ├── llm
+│   │   ├── base.py
+│   │   └── gemini.py
+│   ├── main.py
+│   ├── models
+│   │   ├── context_models.py
+│   │   ├── schema_models.py
+│   │   └── semantic_models.py
+│   ├── services
+│   │   └── schema_service.py
+│   └── temporal_testing.py
+├── arbol_proyecto.txt
+├── dockerfile
+├── estructura.txt
+└── requirements.txt
+
+10 directories, 24 files
