@@ -8,286 +8,65 @@ Example all modules tested
 
 python -m app.temporal_testing
 
+ python -m app.temporal_testing
+
 [1] Async PostgreSQL session created
-2026-05-27 00:11:26,566 INFO sqlalchemy.engine.Engine select pg_catalog.version()
-2026-05-27 00:11:26,567 INFO sqlalchemy.engine.Engine [raw sql] ()
-2026-05-27 00:11:26,584 INFO sqlalchemy.engine.Engine select current_schema()
-2026-05-27 00:11:26,584 INFO sqlalchemy.engine.Engine [raw sql] ()
-2026-05-27 00:11:26,587 INFO sqlalchemy.engine.Engine show standard_conforming_strings
-2026-05-27 00:11:26,587 INFO sqlalchemy.engine.Engine [raw sql] ()
-2026-05-27 00:11:26,589 INFO sqlalchemy.engine.Engine BEGIN (implicit)
-2026-05-27 00:11:26,590 INFO sqlalchemy.engine.Engine 
-            SELECT
-                table_schema,
-                table_name,
-                table_type
-            FROM information_schema.tables
-            WHERE table_schema = $1
-            ORDER BY table_name;
-        
-2026-05-27 00:11:26,590 INFO sqlalchemy.engine.Engine [generated in 0.00042s] ('cd',)
-[2] Extracted 3 tables
-2026-05-27 00:11:26,614 INFO sqlalchemy.engine.Engine 
-            SELECT
-                c.table_schema,
-                c.table_name,
-                c.column_name,
-                c.ordinal_position,
-                c.data_type,
-                c.is_nullable,
-                c.column_default,
-                c.character_maximum_length,
-                c.numeric_precision,
-                c.numeric_scale,
-
-                CASE
-                    WHEN tc.constraint_type = 'PRIMARY KEY'
-                    THEN TRUE
-                    ELSE FALSE
-                END AS is_primary_key,
-
-                CASE
-                    WHEN fk.constraint_type = 'FOREIGN KEY'
-                    THEN TRUE
-                    ELSE FALSE
-                END AS is_foreign_key,
-
-                ccu.table_name AS foreign_table_name,
-                ccu.column_name AS foreign_column_name
-
-            FROM information_schema.columns c
-
-            LEFT JOIN information_schema.key_column_usage kcu
-                ON c.table_schema = kcu.table_schema
-                AND c.table_name = kcu.table_name
-                AND c.column_name = kcu.column_name
-
-            LEFT JOIN information_schema.table_constraints tc
-                ON kcu.constraint_name = tc.constraint_name
-                AND kcu.constraint_schema = tc.constraint_schema
-                AND tc.constraint_type = 'PRIMARY KEY'
-
-            LEFT JOIN information_schema.table_constraints fk
-                ON kcu.constraint_name = fk.constraint_name
-                AND kcu.constraint_schema = fk.constraint_schema
-                AND fk.constraint_type = 'FOREIGN KEY'
-
-            LEFT JOIN information_schema.constraint_column_usage ccu
-                ON fk.constraint_name = ccu.constraint_name
-                AND fk.constraint_schema = ccu.constraint_schema
-
-            WHERE c.table_schema = $1
-            AND c.table_name = $2
-
-            ORDER BY c.ordinal_position;
-        
-2026-05-27 00:11:26,614 INFO sqlalchemy.engine.Engine [generated in 0.00028s] ('cd', 'bookings')
-2026-05-27 00:11:26,657 INFO sqlalchemy.engine.Engine 
-            SELECT
-                c.table_schema,
-                c.table_name,
-                c.column_name,
-                c.ordinal_position,
-                c.data_type,
-                c.is_nullable,
-                c.column_default,
-                c.character_maximum_length,
-                c.numeric_precision,
-                c.numeric_scale,
-
-                CASE
-                    WHEN tc.constraint_type = 'PRIMARY KEY'
-                    THEN TRUE
-                    ELSE FALSE
-                END AS is_primary_key,
-
-                CASE
-                    WHEN fk.constraint_type = 'FOREIGN KEY'
-                    THEN TRUE
-                    ELSE FALSE
-                END AS is_foreign_key,
-
-                ccu.table_name AS foreign_table_name,
-                ccu.column_name AS foreign_column_name
-
-            FROM information_schema.columns c
-
-            LEFT JOIN information_schema.key_column_usage kcu
-                ON c.table_schema = kcu.table_schema
-                AND c.table_name = kcu.table_name
-                AND c.column_name = kcu.column_name
-
-            LEFT JOIN information_schema.table_constraints tc
-                ON kcu.constraint_name = tc.constraint_name
-                AND kcu.constraint_schema = tc.constraint_schema
-                AND tc.constraint_type = 'PRIMARY KEY'
-
-            LEFT JOIN information_schema.table_constraints fk
-                ON kcu.constraint_name = fk.constraint_name
-                AND kcu.constraint_schema = fk.constraint_schema
-                AND fk.constraint_type = 'FOREIGN KEY'
-
-            LEFT JOIN information_schema.constraint_column_usage ccu
-                ON fk.constraint_name = ccu.constraint_name
-                AND fk.constraint_schema = ccu.constraint_schema
-
-            WHERE c.table_schema = $1
-            AND c.table_name = $2
-
-            ORDER BY c.ordinal_position;
-        
-2026-05-27 00:11:26,657 INFO sqlalchemy.engine.Engine [cached since 0.04281s ago] ('cd', 'facilities')
-2026-05-27 00:11:26,670 INFO sqlalchemy.engine.Engine 
-            SELECT
-                c.table_schema,
-                c.table_name,
-                c.column_name,
-                c.ordinal_position,
-                c.data_type,
-                c.is_nullable,
-                c.column_default,
-                c.character_maximum_length,
-                c.numeric_precision,
-                c.numeric_scale,
-
-                CASE
-                    WHEN tc.constraint_type = 'PRIMARY KEY'
-                    THEN TRUE
-                    ELSE FALSE
-                END AS is_primary_key,
-
-                CASE
-                    WHEN fk.constraint_type = 'FOREIGN KEY'
-                    THEN TRUE
-                    ELSE FALSE
-                END AS is_foreign_key,
-
-                ccu.table_name AS foreign_table_name,
-                ccu.column_name AS foreign_column_name
-
-            FROM information_schema.columns c
-
-            LEFT JOIN information_schema.key_column_usage kcu
-                ON c.table_schema = kcu.table_schema
-                AND c.table_name = kcu.table_name
-                AND c.column_name = kcu.column_name
-
-            LEFT JOIN information_schema.table_constraints tc
-                ON kcu.constraint_name = tc.constraint_name
-                AND kcu.constraint_schema = tc.constraint_schema
-                AND tc.constraint_type = 'PRIMARY KEY'
-
-            LEFT JOIN information_schema.table_constraints fk
-                ON kcu.constraint_name = fk.constraint_name
-                AND kcu.constraint_schema = fk.constraint_schema
-                AND fk.constraint_type = 'FOREIGN KEY'
-
-            LEFT JOIN information_schema.constraint_column_usage ccu
-                ON fk.constraint_name = ccu.constraint_name
-                AND fk.constraint_schema = ccu.constraint_schema
-
-            WHERE c.table_schema = $1
-            AND c.table_name = $2
-
-            ORDER BY c.ordinal_position;
-        
-2026-05-27 00:11:26,670 INFO sqlalchemy.engine.Engine [cached since 0.05579s ago] ('cd', 'members')
+[2] Extracted 
 [3] Columns extracted
-2026-05-27 00:11:26,682 INFO sqlalchemy.engine.Engine 
-            SELECT
-                con.conname AS constraint_name,
-
-                nsa.nspname AS source_schema,
-                rel_a.relname AS source_table,
-                att_a.attname AS source_column,
-
-                nsb.nspname AS target_schema,
-                rel_b.relname AS target_table,
-                att_b.attname AS target_column
-
-            FROM pg_constraint con
-
-            JOIN pg_class rel_a
-                ON rel_a.oid = con.conrelid
-
-            JOIN pg_namespace nsa
-                ON nsa.oid = rel_a.relnamespace
-
-            JOIN pg_class rel_b
-                ON rel_b.oid = con.confrelid
-
-            JOIN pg_namespace nsb
-                ON nsb.oid = rel_b.relnamespace
-
-            JOIN pg_attribute att_a
-                ON att_a.attrelid = con.conrelid
-                AND att_a.attnum = ANY(con.conkey)
-
-            JOIN pg_attribute att_b
-                ON att_b.attrelid = con.confrelid
-                AND att_b.attnum = ANY(con.confkey)
-
-            WHERE con.contype = 'f'
-            AND nsa.nspname = $1;
-        
-2026-05-27 00:11:26,682 INFO sqlalchemy.engine.Engine [generated in 0.00023s] ('cd',)
-[4] Extracted 3 relationships
-[5] Schema graph built
-[6] Column graph built
-/home/matthew/TrainingSQL/Api_start/app/temporal_testing.py:84: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-  last_updated=datetime.utcnow()
-/home/matthew/TrainingSQL/Api_start/app/temporal_testing.py:123: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-  last_updated=datetime.utcnow()
-[7] Semantic context built
-[8] LLM context built
-[9] SQL Generator initialized
 
 ====================================
-QUESTION
+RETRIEVED CONTEXT
 ====================================
+{'schema': {'cd.members': {'columns': [{'name': 'memid', 'type': 'integer', 'primary_key': False, 'foreign_key': False}, {'name': 'surname', 'type': 'character varying', 'primary_key': False, 'foreign_key': False}, {'name': 'firstname', 'type': 'character varying', 'primary_key': False, 'foreign_key': False}]}, 'cd.facilities': {'columns': [{'name': 'facid', 'type': 'integer', 'primary_key': False, 'foreign_key': False}, {'name': 'name', 'type': 'character varying', 'primary_key': False, 'foreign_key': False}]}}, 'relationships': [], 'semantic_tables': {'bookings': {'description': 'Business table containing bookings information', 'domain_tags': ['database', 'business'], 'importance_score': 0.5}, 'facilities': {'description': 'Business table containing facilities information', 'domain_tags': ['database', 'business'], 'importance_score': 0.5}, 'members': {'description': 'Business table containing members information', 'domain_tags': ['database', 'business'], 'importance_score': 0.5}}, 'semantic_columns': {'bookings': [{'column': 'bookid', 'description': 'bookid field from bookings', 'semantic_type': 'integer', 'synonyms': []}, {'column': 'facid', 'description': 'facid field from bookings', 'semantic_type': 'integer', 'synonyms': []}, {'column': 'memid', 'description': 'memid field from bookings', 'semantic_type': 'integer', 'synonyms': []}, {'column': 'starttime', 'description': 'starttime field from bookings', 'semantic_type': 'timestamp without time zone', 'synonyms': []}, {'column': 'slots', 'description': 'slots field from bookings', 'semantic_type': 'integer', 'synonyms': []}], 'facilities': [{'column': 'facid', 'description': 'facid field from facilities', 'semantic_type': 'integer', 'synonyms': []}, {'column': 'name', 'description': 'name field from facilities', 'semantic_type': 'character varying', 'synonyms': []}, {'column': 'membercost', 'description': 'membercost field from facilities', 'semantic_type': 'numeric', 'synonyms': []}, {'column': 'guestcost', 'description': 'guestcost field from facilities', 'semantic_type': 'numeric', 'synonyms': []}, {'column': 'initialoutlay', 'description': 'initialoutlay field from facilities', 'semantic_type': 'numeric', 'synonyms': []}, {'column': 'monthlymaintenance', 'description': 'monthlymaintenance field from facilities', 'semantic_type': 'numeric', 'synonyms': []}], 'members': [{'column': 'memid', 'description': 'memid field from members', 'semantic_type': 'integer', 'synonyms': []}, {'column': 'surname', 'description': 'surname field from members', 'semantic_type': 'character varying', 'synonyms': []}, {'column': 'firstname', 'description': 'firstname field from members', 'semantic_type': 'character varying', 'synonyms': []}, {'column': 'address', 'description': 'address field from members', 'semantic_type': 'character varying', 'synonyms': []}, {'column': 'zipcode', 'description': 'zipcode field from members', 'semantic_type': 'integer', 'synonyms': []}, {'column': 'telephone', 'description': 'telephone field from members', 'semantic_type': 'character varying', 'synonyms': []}, {'column': 'recommendedby', 'description': 'recommendedby field from members', 'semantic_type': 'integer', 'synonyms': []}, {'column': 'joindate', 'description': 'joindate field from members', 'semantic_type': 'timestamp without time zone', 'synonyms': []}]}, 'joins': ['cd.bookings.memid = cd.members.memid', 'cd.bookings.facid = cd.facilities.facid', 'cd.members.recommendedby = cd.members.memid']}
 
-            How can you produce a list of all members
-            who have used a tennis court?
+====================================
+MODULATED CONTEXT
+====================================
+DATABASE SCHEMA:
+- cd.members (memid, surname, firstname)
+- cd.facilities (facid, name)
 
-            Include in your output the name
-            of the court, and the name
-            of the member formatted
-            as a single column.
+KNOWN JOINS:
+- cd.bookings.memid = cd.members.memid
+- cd.bookings.facid = cd.facilities.facid
+- cd.members.recommendedby = cd.members.memid
 
-            Ensure no duplicate data,
-            and order by the member name
-            followed by the facility name.
-            
-2026-05-27 00:11:37,962 INFO sqlalchemy.engine.Engine SELECT DISTINCT m.firstname || ' ' || m.surname AS member_name, f.name AS facility_name
-FROM cd.bookings b
+====================================
+CONTEXT METRICS
+====================================
+Raw Context Size: 3486 chars
+Modulated Context Size: 228 chars
+Reduction: 93.46%
+2026-05-27 01:32:50,467 INFO sqlalchemy.engine.Engine SELECT DISTINCT CONCAT(m.firstname,  ' ',  m.surname) AS member_name,  f.name AS facility_name
+FROM cd.members m
+JOIN cd.bookings b ON m.memid = b.memid
 JOIN cd.facilities f ON b.facid = f.facid
-JOIN cd.members m ON b.memid = m.memid
 WHERE f.name LIKE '%Tennis Court%'
-ORDER BY member_name, facility_name
+ORDER BY member_name,  facility_name
 LIMIT 100;
-2026-05-27 00:11:37,962 INFO sqlalchemy.engine.Engine [generated in 0.00095s] ()
+2026-05-27 01:32:50,467 INFO sqlalchemy.engine.Engine [generated in 0.00031s] ()
 
 ====================================
 GENERATED SQL
 ====================================
-SELECT DISTINCT m.firstname || ' ' || m.surname AS member_name, f.name AS facility_name
-FROM cd.bookings b
+SELECT DISTINCT CONCAT(m.firstname,  ' ',  m.surname) AS member_name,  f.name AS facility_name
+FROM cd.members m
+JOIN cd.bookings b ON m.memid = b.memid
 JOIN cd.facilities f ON b.facid = f.facid
-JOIN cd.members m ON b.memid = m.memid
 WHERE f.name LIKE '%Tennis Court%'
-ORDER BY member_name, facility_name
+ORDER BY member_name,  facility_name
 LIMIT 100;
 
 ====================================
 EXPLANATION
 ====================================
 This query:
-1. Joins the bookings table with facilities and members tables
-2. Filters for facilities containing 'Tennis Court' in their name
-3. Combines member firstname and surname into a single column
-4. Returns distinct combinations to avoid duplicates
+1. Joins members to bookings via memid
+2. Joins bookings to facilities via facid
+3. Filters for facilities containing 'Tennis Court' in their name
+4. Selects distinct combinations of member names (concatenated firstname+surname) and facility names
 5. Orders results by member name then facility name
-6. Limits to 100 rows as a safety measure
+6. Limits to 100 results for safety
 
 ====================================
 RESULTS
@@ -314,13 +93,13 @@ RESULTS
 {'member_name': 'GUEST GUEST', 'facility_name': 'Tennis Court 2'}
 
 ====================================
-METRICS
+PIPELINE METRICS
 ====================================
-Execution Time: 0.019s
-LLM Time: 11.255s
+Execution Time: 0.005s
+LLM Time: 8.839s
 
 ====================================
 PIPELINE SUCCESS
 ====================================
-2026-05-27 00:11:37,981 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-05-27 01:32:50,472 INFO sqlalchemy.engine.Engine ROLLBACK
 (venv) matthew@Matthew:~/TrainingSQL/Api_start$ 
