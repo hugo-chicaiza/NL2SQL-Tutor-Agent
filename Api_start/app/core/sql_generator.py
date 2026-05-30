@@ -1,18 +1,23 @@
+# =========================================================
 # app/core/sql_generator.py
+# =========================================================
 
 import json
 import time
 import logging
 
 from dataclasses import dataclass
-from typing import Dict, List, Any
+
+from typing import (
+    Dict,
+    List,
+    Any,
+    Optional,
+    Set
+)
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession
-)
-
-from app.llm.gemini import (
-    GeminiLLMProvider
 )
 
 from app.llm.openrouter import (
@@ -41,6 +46,10 @@ from app.core.executor import (
 
 from app.context.retriever import (
     ContextRetriever
+)
+
+from app.context.semantic_retriever import (
+    SemanticRetriever
 )
 
 from app.context.prompt_modulator import (
@@ -75,7 +84,7 @@ class SQLGenerationResponse:
 
 
 # =========================================================
-# MAIN SQL GENERATOR
+# SQL GENERATOR
 # =========================================================
 
 class SQLGenerator:
@@ -83,42 +92,46 @@ class SQLGenerator:
     def __init__(
         self,
         db_session: AsyncSession,
-        context: LLMContext
+        context: LLMContext,
+        semantic_retriever: Optional[
+            SemanticRetriever
+        ] = None
     ):
 
-        # -------------------------------------------------
-        # LLM PROVIDER
-        # -------------------------------------------------
+        self.llm = (
+            OpenRouterLLMProvider()
+        )
 
-        #self.llm = GeminiLLMProvider()
-        self.llm = OpenRouterLLMProvider()
+        self.planner = (
+            QueryPlanner()
+        )
 
-        # -------------------------------------------------
-        # LOCAL COMPONENTS
-        # -------------------------------------------------
+        self.prompt_builder = (
+            PromptBuilder()
+        )
 
-        self.planner = QueryPlanner()
+        self.validator = (
+            SQLValidator()
+        )
 
-        self.prompt_builder = PromptBuilder()
-
-        self.validator = SQLValidator()
-
-        self.executor = SQLExecutor(
-            db_session=db_session
+        self.executor = (
+            SQLExecutor(
+                db_session=db_session
+            )
         )
 
         self.context_retriever = (
             ContextRetriever()
         )
 
-        # -------------------------------------------------
-        # PREBUILT LLM CONTEXT
-        # -------------------------------------------------
+        self.semantic_retriever = (
+            semantic_retriever
+        )
 
         self.context = context
 
     # =====================================================
-    # MAIN PIPELINE
+    # MAIN ENTRY
     # =====================================================
 
     async def generate(
@@ -129,129 +142,184 @@ class SQLGenerator:
         pipeline_start = time.time()
 
         logger.info(
-            f"Starting NL2SQL generation "
-            f"for: {question}"
+            f"NL2SQL request: {question}"
         )
 
-        # -------------------------------------------------
-        # 1. LOCAL PLANNER
-        # -------------------------------------------------
+        # =================================================
+        # 1. PLAN
+        # =================================================
 
-        plan = self.planner.build_plan(
-            question
-        )
-
-        logger.info(
-            f"Execution plan generated: "
-            f"{plan}"
-        )
-
-
-
-        # -------------------------------------------------
-        # 2. RETRIEVE CONTEXT
-        # -------------------------------------------------
-
-        retrieved_context = (
-            self.context_retriever.retrieve(
-                question=question,
-                plan=plan,
-                llm_context=self.context
+        plan = (
+            self.planner.build_plan(
+                question
             )
         )
 
-        relevant_context = (
-            PromptModulator.build_context_text(
+        logger.info(
+            f"Plan generated: {plan}"
+        )
+
+        # =================================================
+        # 2. SEMANTIC RETRIEVAL
+        # =================================================
+
+        semantic_candidates: Optional[
+            Set[str]
+        ] = None
+
+        if self.semantic_retriever:
+
+            try:
+
+                if (
+                    self.semantic_retriever
+                    .is_ready()
+                ):
+
+                    semantic_candidates = (
+                        self.semantic_retriever
+                        .retrieve(question)
+                    )
+
+                    logger.info(
+                        f"Semantic candidates: "
+                        f"{semantic_candidates}"
+                    )
+
+            except Exception as e:
+
+                logger.warning(
+                    f"Semantic retrieval failed: "
+                    f"{str(e)}"
+                )
+
+                semantic_candidates = None
+
+        # =================================================
+        # 3. CONTEXT RETRIEVAL
+        # =================================================
+
+        retrieved_context = (
+
+            self.context_retriever
+            .retrieve(
+
+                question=question,
+
+                plan=plan,
+
+                llm_context=self.context,
+
+                semantic_candidates=
+                    semantic_candidates
+            )
+        )
+
+        logger.info(
+            "Context retrieved"
+        )
+
+        # =================================================
+        # 4. CONTEXT MODULATION
+        # =================================================
+
+        modulated_context = (
+
+            PromptModulator
+            .build_context_text(
                 retrieved_context
             )
         )
 
-        logger.info(
-            "Relevant context retrieved"
-        )
-
-        # -------------------------------------------------
-        # 3. BUILD PROMPT
-        # -------------------------------------------------
+        # =================================================
+        # 5. BUILD PROMPT
+        # =================================================
 
         prompt = (
-            self.prompt_builder.build_prompt(
+
+            self.prompt_builder
+            .build_prompt(
+
                 question=question,
-                relevant_context=relevant_context,
+
+                relevant_context=
+                    modulated_context,
+
                 plan=plan
             )
         )
 
         logger.info(
-            "Prompt generated successfully"
+            "Prompt built"
         )
 
-        # -------------------------------------------------
-        # 4. SINGLE LLM CALL
-        # -------------------------------------------------
+        # =================================================
+        # 6. GENERATE SQL
+        # =================================================
 
         llm_response = await (
-            self._generate_sql_and_reasoning(
+            self._generate_sql(
                 prompt
             )
         )
 
-        sql = self._format_sql(llm_response["sql"])
+        sql = self._format_sql(
+            llm_response["sql"]
+        )
 
         explanation = (
-            llm_response["explanation"]
+            llm_response[
+                "explanation"
+            ]
         )
 
         llm_time = (
-            llm_response["llm_time"]
+            llm_response[
+                "llm_time"
+            ]
         )
 
-        logger.info(
-            "SQL generated successfully"
-        )
-
-        # -------------------------------------------------
-        # 5. VALIDATE SQL
-        # -------------------------------------------------
+        # =================================================
+        # 7. VALIDATE SQL
+        # =================================================
 
         validated_sql = (
+
             self.validator.validate(
                 sql
             )
         )
 
         logger.info(
-            "SQL validation completed"
+            "SQL validated"
         )
 
-        # -------------------------------------------------
-        # 6. EXECUTE SQL
-        # -------------------------------------------------
+        # =================================================
+        # 8. EXECUTE
+        # =================================================
 
         rows, execution_time = await (
+
             self.executor.execute(
                 validated_sql
             )
         )
 
         logger.info(
-            f"Query executed in "
-            f"{execution_time}s"
+            f"Rows returned: "
+            f"{len(rows)}"
         )
 
-        total_pipeline_time = round(
-            time.time() - pipeline_start,
+        total_time = round(
+            time.time() -
+            pipeline_start,
             3
         )
 
         logger.info(
-            f"Pipeline completed in "
-            f"{total_pipeline_time}s"
+            f"Pipeline completed "
+            f"in {total_time}s"
         )
-
-        # -------------------------------------------------
-        # 7. FINAL RESPONSE
-        # -------------------------------------------------
 
         return SQLGenerationResponse(
 
@@ -263,130 +331,141 @@ class SQLGenerator:
 
             rows=rows,
 
-            execution_time=execution_time,
+            execution_time=
+                execution_time,
 
             plan=plan,
 
-            relevant_context=relevant_context,
+            relevant_context=
+                modulated_context,
 
             llm_time=llm_time
         )
 
     # =====================================================
-    # SINGLE OPTIMIZED LLM CALL
+    # LLM CALL
     # =====================================================
 
-    async def _generate_sql_and_reasoning(
+    async def _generate_sql(
         self,
         prompt: str
     ) -> Dict[str, Any]:
 
-        llm_start = time.time()
+        start_time = time.time()
 
-        response = await self.llm.generate(
-            prompt
+        response = await (
+            self.llm.generate(
+                prompt
+            )
         )
 
-        raw_text = response.strip()
+        raw = response.strip()
 
-        # -------------------------------------------------
-        # CLEAN MARKDOWN
-        # -------------------------------------------------
-
-        raw_text = raw_text.replace(
+        raw = raw.replace(
             "```json",
             ""
         )
 
-        raw_text = raw_text.replace(
+        raw = raw.replace(
             "```",
             ""
         )
 
-        raw_text = raw_text.strip()
-
-        # -------------------------------------------------
-        # PARSE JSON RESPONSE
-        # -------------------------------------------------
+        raw = raw.strip()
 
         try:
 
             data = json.loads(
-                raw_text
+                raw
             )
 
         except Exception as e:
 
             logger.error(
-                f"Failed parsing LLM JSON: "
+                f"JSON parsing error: "
                 f"{str(e)}"
             )
 
-            logger.error(
-                f"Raw LLM response: "
-                f"{raw_text}"
-            )
+            logger.error(raw)
 
             raise Exception(
                 "LLM returned invalid JSON"
             )
 
-        # -------------------------------------------------
-        # VALIDATE RESPONSE STRUCTURE
-        # -------------------------------------------------
-
         if "sql" not in data:
 
             raise Exception(
-                "LLM response missing "
-                "'sql'"
+                "Missing sql field"
             )
 
         if "explanation" not in data:
 
             raise Exception(
-                "LLM response missing "
-                "'explanation'"
+                "Missing explanation field"
             )
 
         llm_time = round(
-            time.time() - llm_start,
+            time.time() -
+            start_time,
             3
         )
 
         return {
 
-            "sql": data["sql"].strip(),
+            "sql":
+                data["sql"].strip(),
 
-            "explanation": (
-                data["explanation"].strip()
-            ),
+            "explanation":
+                data[
+                    "explanation"
+                ].strip(),
 
-            "llm_time": llm_time
+            "llm_time":
+                llm_time
         }
 
-    def _format_sql(self, sql: str) -> str:
-        """
-        Formats SQL into readable multi-line structure.
-        Lightweight formatter (no external libs).
-        """
+    # =====================================================
+    # SQL FORMATTER
+    # =====================================================
 
+    def _format_sql(self, sql: str) -> str:
+
+        if not sql:
+            return sql
+
+        sql = sql.strip()
+
+        # ❌ remove trailing semicolon safely
+        sql = sql.rstrip(";")
+
+        # ❌ FIX: remove accidental semicolon before LIMIT (CRITICAL BUG)
+        sql = sql.replace(";\nLIMIT", "\nLIMIT")
+        sql = sql.replace("; LIMIT", "\nLIMIT")
+
+        # 🔧 basic formatting (safe version)
         keywords = [
-            "SELECT", "FROM", "WHERE", "JOIN",
-            "INNER JOIN", "LEFT JOIN", "RIGHT JOIN",
-            "GROUP BY", "ORDER BY", "LIMIT", "HAVING"
+            "SELECT",
+            "FROM",
+            "WHERE",
+            "JOIN",
+            "INNER JOIN",
+            "LEFT JOIN",
+            "RIGHT JOIN",
+            "GROUP BY",
+            "ORDER BY",
+            "HAVING",
+            "LIMIT"
         ]
 
         formatted = sql
 
-        # Normalize spacing
-        formatted = formatted.replace(",", ", ")
+        for keyword in keywords:
+            formatted = formatted.replace(keyword, f"\n{keyword}")
 
-        # Break lines before keywords
-        for kw in keywords:
-            formatted = formatted.replace(kw, f"\n{kw}")
-
-        # Clean multiple spaces/newlines
-        lines = [line.strip() for line in formatted.split("\n") if line.strip()]
+        lines = [
+            line.strip()
+            for line in formatted.split("\n")
+            if line.strip()
+        ]
 
         return "\n".join(lines)

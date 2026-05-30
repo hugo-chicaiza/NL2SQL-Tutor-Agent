@@ -4,7 +4,7 @@
 
 import logging
 
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Set, Optional
 
 from app.models.context_models import (
     LLMContext
@@ -16,18 +16,23 @@ logger = logging.getLogger(__name__)
 class ContextRetriever:
 
     """
-    Intelligent context reduction layer.
+    Enterprise Context Retrieval Layer.
 
     Responsibilities:
-    - detect relevant tables
-    - detect relevant columns
-    - expand graph joins
-    - reduce prompt size
-    - keep only useful schema context
+    - deterministic retrieval
+    - semantic retrieval integration
+    - graph expansion
+    - schema reduction
+    - relationship filtering
+    - semantic filtering
     """
 
+    MAX_GRAPH_NEIGHBORS = 3
+
+    DEFAULT_FALLBACK_TABLES = 3
+
     # =====================================================
-    # MAIN RETRIEVAL
+    # MAIN ENTRYPOINT
     # =====================================================
 
     @staticmethod
@@ -35,129 +40,118 @@ class ContextRetriever:
         question: str,
         plan: Dict[str, Any],
         llm_context: LLMContext,
+        semantic_candidates: Optional[Set[str]] = None,
     ) -> Dict[str, Any]:
 
         logger.info(
-            "Starting intelligent context retrieval"
+            "Starting context retrieval"
         )
 
         question_lower = question.lower()
 
-        # =================================================
-        # 1. DETECT RELEVANT TABLES
-        # =================================================
+        # -------------------------------------------------
+        # 1. TABLE SELECTION
+        # -------------------------------------------------
 
-        relevant_tables = (
-            ContextRetriever
-            ._detect_relevant_tables(
-                question=question_lower,
-                context=llm_context
+        if semantic_candidates:
+
+            selected_tables = {
+
+                t
+                for t in semantic_candidates
+                if t in llm_context.schema.tables
+            }
+
+            selection_source = "semantic"
+
+        else:
+
+            selected_tables = (
+                ContextRetriever
+                ._detect_relevant_tables(
+                    question_lower,
+                    llm_context
+                )
             )
-        )
 
-        logger.info(
-            f"Relevant tables detected: "
-            f"{relevant_tables}"
-        )
+            selection_source = "deterministic"
 
-        # =================================================
+        # -------------------------------------------------
         # FALLBACK
-        # =================================================
+        # -------------------------------------------------
 
-        if not relevant_tables:
+        if not selected_tables:
 
-            logger.warning(
-                "No relevant tables detected. "
-                "Using fallback tables."
+            selected_tables = (
+                ContextRetriever
+                ._fallback_tables(
+                    llm_context
+                )
             )
 
-            relevant_tables = set(
-                list(
-                    llm_context.schema.tables.keys()
-                )[:2]
-            )
+            selection_source = "fallback"
 
-        # =================================================
+        # -------------------------------------------------
         # 2. GRAPH EXPANSION
-        # =================================================
+        # -------------------------------------------------
 
         expanded_tables = (
             ContextRetriever
             ._expand_related_tables(
-                tables=relevant_tables,
-                context=llm_context
+                selected_tables,
+                llm_context
             )
         )
 
-        logger.info(
-            f"Expanded tables: "
-            f"{expanded_tables}"
-        )
-
-        # =================================================
-        # 3. FILTER SCHEMA
-        # =================================================
+        # -------------------------------------------------
+        # 3. FILTER CONTEXT
+        # -------------------------------------------------
 
         filtered_schema = (
             ContextRetriever
             ._filter_schema(
-                tables=expanded_tables,
-                context=llm_context,
-                question=question_lower
+                expanded_tables,
+                llm_context,
+                question_lower
             )
         )
-
-        # =================================================
-        # 4. FILTER RELATIONSHIPS
-        # =================================================
 
         filtered_relationships = (
             ContextRetriever
             ._filter_relationships(
-                tables=expanded_tables,
-                context=llm_context
+                expanded_tables,
+                llm_context
             )
         )
-
-        # =================================================
-        # 5. FILTER JOINS
-        # =================================================
 
         filtered_joins = (
             ContextRetriever
             ._filter_joins(
-                tables=expanded_tables,
-                context=llm_context
+                expanded_tables,
+                llm_context
             )
         )
-
-        # =================================================
-        # 6. FILTER SEMANTICS
-        # =================================================
 
         filtered_semantic_tables = (
             ContextRetriever
             ._filter_semantic_tables(
-                tables=expanded_tables,
-                context=llm_context
+                expanded_tables,
+                llm_context
             )
         )
 
         filtered_semantic_columns = (
             ContextRetriever
             ._filter_semantic_columns(
-                tables=expanded_tables,
-                context=llm_context
+                expanded_tables,
+                llm_context
             )
         )
 
         logger.info(
-            "Context retrieval completed"
+            f"Context retrieval completed. "
+            f"{len(expanded_tables)} tables selected."
         )
-
-        # =================================================
-        # FINAL REDUCED CONTEXT
-        # =================================================
 
         return {
 
@@ -167,18 +161,77 @@ class ContextRetriever:
             "relationships":
                 filtered_relationships,
 
+            "joins":
+                filtered_joins,
+
             "semantic_tables":
                 filtered_semantic_tables,
 
             "semantic_columns":
                 filtered_semantic_columns,
 
-            "joins":
-                filtered_joins,
+            "retrieval_metadata": {
+
+                "selection_source":
+                    selection_source,
+
+                "tables_selected":
+                    sorted(expanded_tables),
+
+                "table_count":
+                    len(expanded_tables)
+            }
         }
 
     # =====================================================
-    # TABLE DETECTION
+    # FALLBACK
+    # =====================================================
+
+    @staticmethod
+    def _fallback_tables(
+        context: LLMContext
+    ) -> Set[str]:
+
+        semantic_tables = (
+            context.semantics.tables
+        )
+
+        if semantic_tables:
+
+            ordered = sorted(
+
+                semantic_tables.items(),
+
+                key=lambda x:
+                    x[1].get(
+                        "importance_score",
+                        0
+                    ),
+
+                reverse=True
+            )
+
+            return {
+
+                table
+
+                for table, _ in ordered[
+                    :ContextRetriever
+                    .DEFAULT_FALLBACK_TABLES
+                ]
+            }
+
+        return set(
+            list(
+                context.schema.tables.keys()
+            )[
+                :ContextRetriever
+                .DEFAULT_FALLBACK_TABLES
+            ]
+        )
+
+    # =====================================================
+    # DETERMINISTIC TABLE DETECTION
     # =====================================================
 
     @staticmethod
@@ -189,83 +242,81 @@ class ContextRetriever:
 
         relevant = set()
 
-        # -------------------------------------------------
-        # TABLE NAME MATCHING
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # TABLE NAME MATCH
+        # ---------------------------------------------
 
-        for table_name in (
-            context.schema.tables.keys()
-        ):
+        for table_name in context.schema.tables:
 
-            normalized = (
+            short_name = (
                 table_name
                 .split(".")[-1]
                 .lower()
             )
 
             singular = (
-                normalized[:-1]
-                if normalized.endswith("s")
-                else normalized
+                short_name[:-1]
+                if short_name.endswith("s")
+                else short_name
             )
 
             if (
-                normalized in question
+                short_name in question
                 or singular in question
             ):
-
                 relevant.add(table_name)
 
-        # -------------------------------------------------
-        # COLUMN MATCHING
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # COLUMN MATCH
+        # ---------------------------------------------
 
         for table_name, table_data in (
             context.schema.tables.items()
         ):
 
-            for col in table_data["columns"]:
+            for column in (
+                table_data["columns"]
+            ):
 
                 col_name = (
-                    col["name"]
+                    column["name"]
                     .lower()
                 )
 
                 if col_name in question:
 
-                    relevant.add(table_name)
+                    relevant.add(
+                        table_name
+                    )
 
-        # -------------------------------------------------
-        # SEMANTIC MATCHING
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # SEMANTIC TABLE MATCH
+        # ---------------------------------------------
 
         for table_name, semantic in (
             context.semantics.tables.items()
         ):
 
-            description = (
-                semantic
-                .get("description", "")
-                .lower()
-            )
-
-            domain_tags = semantic.get(
+            tags = semantic.get(
                 "domain_tags",
                 []
             )
 
+            description = semantic.get(
+                "description",
+                ""
+            ).lower()
+
             if any(
                 tag.lower() in question
-                for tag in domain_tags
+                for tag in tags
             ):
-
                 relevant.add(table_name)
 
             if any(
                 word in description
                 for word in question.split()
             ):
-
                 relevant.add(table_name)
 
         return relevant
@@ -282,52 +333,26 @@ class ContextRetriever:
 
         expanded = set(tables)
 
-        adjacency = (
-            context.graph.adjacency
-        )
-
         for table in tables:
 
-            table_short = (
-                table.split(".")[-1]
+            neighbors = (
+                context.graph.adjacency.get(
+                    table,
+                    []
+                )[
+                    :ContextRetriever
+                    .MAX_GRAPH_NEIGHBORS
+                ]
             )
 
-            neighbors = adjacency.get(
-                table_short,
-                []
+            expanded.update(
+                neighbors
             )
-
-            for neighbor in neighbors:
-
-                # normalize full name
-                full_neighbor = None
-
-                for schema_table in (
-                    context.schema.tables.keys()
-                ):
-
-                    if (
-                        schema_table.endswith(
-                            f".{neighbor}"
-                        )
-                    ):
-
-                        full_neighbor = (
-                            schema_table
-                        )
-
-                        break
-
-                if full_neighbor:
-
-                    expanded.add(
-                        full_neighbor
-                    )
 
         return expanded
 
     # =====================================================
-    # FILTER SCHEMA
+    # SCHEMA FILTERING
     # =====================================================
 
     @staticmethod
@@ -337,21 +362,7 @@ class ContextRetriever:
         question: str,
     ) -> Dict[str, Any]:
 
-        filtered = {}
-
-        wants_all_columns = any(
-
-            phrase in question
-
-            for phrase in [
-
-                "all information",
-                "all columns",
-                "select *",
-                "everything",
-                "full table",
-            ]
-        )
+        result = {}
 
         for table in tables:
 
@@ -361,127 +372,128 @@ class ContextRetriever:
                 continue
 
             table_data = (
-                context
-                .schema
-                .tables[table]
+                context.schema.tables[
+                    table
+                ]
             )
 
-            filtered_columns = []
+            semantic_columns = (
+                context.semantics.columns.get(
+                    table,
+                    []
+                )
+            )
 
-            for col in (
+            semantic_terms = set()
+
+            for col in semantic_columns:
+
+                semantic_terms.update(
+
+                    synonym.lower()
+
+                    for synonym in col.get(
+                        "synonyms",
+                        []
+                    )
+                )
+
+            selected_columns = []
+
+            for column in (
                 table_data["columns"]
             ):
 
                 col_name = (
-                    col["name"]
+                    column["name"]
                     .lower()
                 )
 
                 important = (
 
-                    wants_all_columns
-
-                    or
-
-                    col.get(
-                        "primary_key"
+                    column.get(
+                        "primary_key",
+                        False
                     )
 
                     or
 
-                    col.get(
-                        "foreign_key"
+                    column.get(
+                        "foreign_key",
+                        False
                     )
-
-                    or
-
-                    "name" in col_name
-
-                    or
-
-                    "id" in col_name
 
                     or
 
                     col_name in question
+
+                    or
+
+                    any(
+                        term in question
+                        for term in semantic_terms
+                    )
                 )
 
                 if important:
 
-                    filtered_columns.append(
-                        {
-                            "name": col["name"],
-                            "type": col["type"],
-                            "primary_key": col.get(
-                                "primary_key",
-                                False
-                            ),
-                            "foreign_key": col.get(
-                                "foreign_key",
-                                False
-                            )
-                        }
+                    selected_columns.append(
+                        column
                     )
 
-            filtered[table] = {
+            if not selected_columns:
+
+                selected_columns = (
+                    table_data["columns"][:10]
+                )
+
+            result[table] = {
+
+                **table_data,
 
                 "columns":
-                    filtered_columns
+                    selected_columns
             }
 
-        return filtered
+        return result
 
     # =====================================================
-    # FILTER RELATIONSHIPS
+    # RELATIONSHIPS
     # =====================================================
 
     @staticmethod
     def _filter_relationships(
         tables: Set[str],
         context: LLMContext,
-    ) -> List[dict]:
+    ) -> List[Dict[str, Any]]:
 
-        filtered = []
-
-        normalized_tables = {
-
-            table.split(".")[-1]
-            for table in tables
-        }
+        relationships = []
 
         for edge in (
             context.graph.edges
         ):
 
-            src = edge["source_table"]
-            tgt = edge["target_table"]
+            src = edge[
+                "source_table"
+            ]
+
+            tgt = edge[
+                "target_table"
+            ]
 
             if (
-                src in normalized_tables
-                and tgt in normalized_tables
+                src in tables
+                and tgt in tables
             ):
 
-                filtered.append({
+                relationships.append(
+                    edge
+                )
 
-                    "source":
-                        src,
-
-                    "target":
-                        tgt,
-
-                    "on":
-                        (
-                            f"{src}."
-                            f"{edge['source_column']} = "
-                            f"{tgt}."
-                            f"{edge['target_column']}"
-                        )
-                })
-
-        return filtered
+        return relationships
 
     # =====================================================
-    # FILTER JOINS
+    # JOINS
     # =====================================================
 
     @staticmethod
@@ -492,25 +504,18 @@ class ContextRetriever:
 
         joins = []
 
-        normalized_tables = {
-
-            table.split(".")[-1]
-            for table in tables
-        }
-
         for join in context.joins:
 
             if any(
                 table in join
-                for table in normalized_tables
+                for table in tables
             ):
-
                 joins.append(join)
 
         return joins
 
     # =====================================================
-    # FILTER TABLE SEMANTICS
+    # TABLE SEMANTICS
     # =====================================================
 
     @staticmethod
@@ -534,7 +539,7 @@ class ContextRetriever:
         }
 
     # =====================================================
-    # FILTER COLUMN SEMANTICS
+    # COLUMN SEMANTICS
     # =====================================================
 
     @staticmethod

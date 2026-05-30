@@ -9,3 +9,5 @@ asyncpg
 google-genai
 google-generativeai 
 sqlparse 
+numpy
+faiss-cpu
