@@ -10,9 +10,10 @@ async def main():
         service = NL2SQLService(session)
 
         question = """
-        Debes listar usuarios que hayan usado instalaciones de tenis,
-        mostrando en una sola columna el nombre del usuario y la instalación.
-        Evita duplicados y ordena por usuario y luego instalación.
+        How can you produce a list of all members who have used a tennis court? 
+        Include in your output the name of the court, and the name of the member
+         formatted as a single column. Ensure no duplicate data, and order by the 
+         member name followed by the facility name.
         """
 
         response = await service.run(question)
