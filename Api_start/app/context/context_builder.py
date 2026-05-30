@@ -8,10 +8,6 @@ from app.models.context_models import (
 
 class ContextBuilderLLM:
 
-    # =====================================================
-    # BUILD FULL LLM CONTEXT
-    # =====================================================
-
     @staticmethod
     def build(
         tables,
@@ -21,137 +17,46 @@ class ContextBuilderLLM:
         semantic_context,
     ) -> LLMContext:
 
-        # -------------------------------------------------
-        # TABLE SEMANTICS
-        # -------------------------------------------------
-
-        table_semantics = {}
-
-        for table in tables:
-
-            semantic_match = next(
-
-                (
-                    s
-                    for s in semantic_context.tables
-                    if s.table_name == table.table_name
-                ),
-
-                None
+        schema_block = (
+            ContextBuilderLLM._build_schema(
+                tables=tables,
+                columns=columns
             )
+        )
 
-            table_semantics[table.table_name] = {
+        table_semantics = (
+            ContextBuilderLLM._build_table_semantics(
+                tables=tables,
+                semantic_context=semantic_context
+            )
+        )
 
-                "description":
-
-                    semantic_match.business_meaning
-                    if semantic_match
-                    and semantic_match.business_meaning
-                    else "",
-
-                "domain_tags":
-
-                    semantic_match.domain_tags
-                    if semantic_match
-                    else [],
-
-                "importance_score":
-
-                    semantic_match.importance_score
-                    if semantic_match
-                    else 0.0
-            }
-
-        # -------------------------------------------------
-        # COLUMN SEMANTICS
-        # -------------------------------------------------
-
-        column_semantics = {}
-
-        for table_name, cols in columns.items():
-
-            column_semantics[table_name] = []
-
-            for c in cols:
-
-                semantic_match = next(
-
-                    (
-                        s
-                        for s in semantic_context.columns
-                        if (
-                            s.table_name == table_name
-                            and s.column_name == c.column_name
-                        )
-                    ),
-
-                    None
-                )
-
-                column_semantics[
-                    table_name
-                ].append({
-
-                    "column": c.column_name,
-
-                    "description":
-
-                        semantic_match.business_meaning
-                        if semantic_match
-                        and semantic_match.business_meaning
-                        else "",
-
-                    "semantic_type":
-
-                        semantic_match.semantic_type
-                        if semantic_match
-                        else "",
-
-                    "synonyms":
-
-                        semantic_match.synonyms
-                        if semantic_match
-                        else []
-                })
-
-        # -------------------------------------------------
-        # FINAL LLM CONTEXT
-        # -------------------------------------------------
+        column_semantics = (
+            ContextBuilderLLM._build_column_semantics(
+                columns=columns,
+                semantic_context=semantic_context
+            )
+        )
 
         return LLMContext(
 
             schema=SchemaBlock(
-
-                tables=ContextBuilderLLM._build_schema(
-                    tables,
-                    columns
-                )
+                tables=schema_block
             ),
 
             graph=GraphBlock(
-
                 adjacency=schema_graph.adjacency,
-
-                reverse_adjacency=(
-                    schema_graph.reverse_adjacency
-                ),
-
+                reverse_adjacency=schema_graph.reverse_adjacency,
                 edges=schema_graph.edges,
             ),
 
             semantics=SemanticBlock(
-
                 tables=table_semantics,
-
                 columns=column_semantics,
             ),
 
             joins=column_graph.join_clauses,
         )
-
-    # =====================================================
-    # SERIALIZATION FOR PROMPT
-    # =====================================================
 
     @staticmethod
     def to_prompt_context(
@@ -176,106 +81,186 @@ class ContextBuilderLLM:
                 llm_context.joins,
         }
 
-    # =====================================================
-    # BUILD SCHEMA BLOCK
-    # =====================================================
-
     @staticmethod
-    def _build_schema(
+    def _build_table_semantics(
         tables,
-        columns
+        semantic_context,
     ):
 
-        schema_map = {
+        semantic_lookup = {
 
-            f"{t.schema_name}.{t.table_name}": {
-
-                "schema": t.schema_name,
-
-                "table": t.table_name,
-
-                "type": t.table_type,
-
-                "columns": []
-            }
-
-            for t in tables
+            s.table_name: s
+            for s in semantic_context.tables
         }
 
-        # -------------------------------------------------
-        # BUILD COLUMNS
-        # -------------------------------------------------
+        result = {}
+
+        for table in tables:
+
+            full_name = (
+                f"{table.schema_name}."
+                f"{table.table_name}"
+            )
+
+            semantic = semantic_lookup.get(
+                table.table_name
+            )
+
+            result[full_name] = {
+
+                "description":
+                    semantic.business_meaning
+                    if semantic and semantic.business_meaning
+                    else "",
+
+                "domain_tags":
+                    semantic.domain_tags
+                    if semantic
+                    else [],
+
+                "importance_score":
+                    semantic.importance_score
+                    if semantic
+                    else 0.0,
+            }
+
+        return result
+
+    @staticmethod
+    def _build_column_semantics(
+        columns,
+        semantic_context,
+    ):
+
+        semantic_lookup = {
+
+            (
+                s.table_name,
+                s.column_name
+            ): s
+
+            for s in semantic_context.columns
+        }
+
+        result = {}
 
         for table_name, cols in columns.items():
 
             if not cols:
                 continue
 
-            # obtener schema desde primer column object
             schema_name = cols[0].schema_name
 
-            table_key = (
+            full_table_name = (
                 f"{schema_name}.{table_name}"
             )
 
-            if table_key not in schema_map:
+            result[full_table_name] = []
+
+            for col in cols:
+
+                semantic = semantic_lookup.get(
+                    (
+                        table_name,
+                        col.column_name
+                    )
+                )
+
+                result[
+                    full_table_name
+                ].append({
+
+                    "column":
+                        col.column_name,
+
+                    "description":
+                        semantic.business_meaning
+                        if semantic
+                        and semantic.business_meaning
+                        else "",
+
+                    "semantic_type":
+                        semantic.semantic_type
+                        if semantic
+                        else "",
+
+                    "synonyms":
+                        semantic.synonyms
+                        if semantic
+                        else [],
+                })
+
+        return result
+
+    @staticmethod
+    def _build_schema(
+        tables,
+        columns,
+    ):
+
+        schema_map = {}
+
+        for table in tables:
+
+            full_name = (
+                f"{table.schema_name}."
+                f"{table.table_name}"
+            )
+
+            schema_map[full_name] = {
+
+                "schema":
+                    table.schema_name,
+
+                "table":
+                    table.table_name,
+
+                "type":
+                    table.table_type,
+
+                "columns": []
+            }
+
+        for table_name, cols in columns.items():
+
+            if not cols:
                 continue
 
-            for c in cols:
+            schema_name = cols[0].schema_name
 
-                col_name = (
-                    getattr(
-                        c,
-                        "column_name",
-                        None
-                    )
-                    or c.get(
-                        "column_name"
-                    )
-                )
+            full_table_name = (
+                f"{schema_name}.{table_name}"
+            )
 
-                col_type = (
-                    getattr(
-                        c,
-                        "data_type",
-                        None
-                    )
-                    or c.get(
-                        "data_type"
-                    )
-                )
+            if full_table_name not in schema_map:
+                continue
 
-                nullable = getattr(
-                    c,
-                    "is_nullable",
-                    None
-                )
-
-                pk = getattr(
-                    c,
-                    "is_primary_key",
-                    None
-                )
-
-                fk = getattr(
-                    c,
-                    "is_foreign_key",
-                    None
-                )
+            for col in cols:
 
                 schema_map[
-                    table_key
+                    full_table_name
                 ]["columns"].append({
 
-                    "name": col_name,
+                    "name":
+                        col.column_name,
 
-                    "type": col_type,
+                    "type":
+                        col.data_type,
 
-                    "nullable": nullable,
+                    "nullable":
+                        col.is_nullable,
 
-                    "primary_key": pk,
+                    "primary_key":
+                        col.is_primary_key,
 
-                    "foreign_key": fk,
+                    "foreign_key":
+                        col.is_foreign_key,
+
+                    "foreign_table":
+                        col.foreign_table_name,
+
+                    "foreign_column":
+                        col.foreign_column_name,
                 })
 
         return schema_map

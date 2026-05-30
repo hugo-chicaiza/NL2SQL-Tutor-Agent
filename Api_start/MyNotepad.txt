@@ -10,8 +10,8 @@ cambiar de interprete
 
 ----------- run in venv
 python -m app.temporal_testing
-
-SQL_ECHO=false python -m app.ttemporal_testing
+python -c "import os; print(os.getenv('OPENROUTER_API_KEY'))"
+SQL_ECHO=false python -m app.temporal_testing
 
 docker exec -it sql_agent_api bash
 

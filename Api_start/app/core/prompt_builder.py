@@ -1,5 +1,5 @@
 # =========================================================
-# app/core/sql_generator/prompt_builder.py
+# app/core/prompt_builder.py
 # =========================================================
 
 import json
@@ -9,79 +9,112 @@ from typing import Dict, Any
 
 class PromptBuilder:
 
+    """
+    Builds the final NL2SQL prompt.
+
+    Responsibilities:
+    - inject filtered schema
+    - inject semantic metadata
+    - inject planner hints
+    - enforce output format
+    """
+
+    @staticmethod
     def build_prompt(
-        self,
         question: str,
         relevant_context: Dict[str, Any],
         plan: Dict[str, Any]
     ) -> str:
 
-        serialized_context = json.dumps(
+        context_json = json.dumps(
             relevant_context,
-            indent=2
+            indent=2,
+            ensure_ascii=False
         )
 
-        serialized_plan = json.dumps(
+        plan_json = json.dumps(
             plan,
-            indent=2
+            indent=2,
+            ensure_ascii=False
         )
 
         return f"""
-You are an elite PostgreSQL SQL engineer.
+You are a senior PostgreSQL query generation engine.
 
-Your task:
-Generate enterprise-grade PostgreSQL SQL using ONLY the provided semantic context.
+Your objective is to generate a valid PostgreSQL query using ONLY the provided context.
 
-==================================================
-SEMANTIC DATABASE CONTEXT
-==================================================
+========================================================
+DATABASE CONTEXT
+========================================================
 
-{serialized_context}
+{context_json}
 
-==================================================
+========================================================
 USER QUESTION
-==================================================
+========================================================
 
 {question}
 
-==================================================
-EXECUTION PLAN
-==================================================
+========================================================
+QUERY PLAN
+========================================================
 
-{serialized_plan}
+{plan_json}
 
-==================================================
-STRICT RULES
-==================================================
+========================================================
+MANDATORY RULES
+========================================================
 
-1. Use ONLY PostgreSQL syntax
-2. NEVER hallucinate:
+1. Use ONLY tables present in DATABASE CONTEXT.
+
+2. Use ONLY columns present in DATABASE CONTEXT.
+
+3. Use ONLY relationships and joins present in DATABASE CONTEXT.
+
+4. NEVER invent:
    - tables
    - columns
+   - aliases
    - joins
-3. NEVER generate:
-   - DELETE
-   - UPDATE
+
+5. Generate PostgreSQL syntax only.
+
+6. NEVER generate:
    - INSERT
+   - UPDATE
+   - DELETE
    - DROP
    - ALTER
    - TRUNCATE
-4. Use explicit JOIN syntax
-5. SQL must be executable
-6. Add LIMIT when possible
-7. Avoid SELECT *
-8. Use aliases when appropriate
-9. Use ONLY context-provided schema
-10. NEVER output markdown
+   - CREATE
 
-==================================================
-RESPONSE FORMAT
-==================================================
+7. Use explicit JOIN clauses.
+
+8. Avoid SELECT *.
+
+9. Use aggregation only when required.
+
+10. Respect planner hints.
+
+11. Add LIMIT when appropriate.
+
+12. If multiple joins exist,
+    prefer joins listed in the "joins" section.
+
+13. Return executable SQL.
+
+========================================================
+OUTPUT FORMAT
+========================================================
 
 Return ONLY valid JSON.
 
 {{
-    "sql": "SELECT ...",
-    "explanation": "Detailed human explanation"
+  "sql": "SELECT ...",
+  "explanation": "Explain how the query answers the question."
 }}
+
+DO NOT RETURN MARKDOWN.
+DO NOT USE ```json.
+DO NOT ADD EXTRA TEXT.
 """

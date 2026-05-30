@@ -2,14 +2,20 @@
 ├── MyNotepad.txt
 ├── PSQL_User.txt
 ├── app
+│   ├── api
+│   │   └── nl2sql.py
 │   ├── cache
 │   ├── config.py
 │   ├── context
-│   │   └── context_builder.py
+│   │   ├── context_builder.py
+│   │   ├── embeddings.py
+│   │   ├── prompt_modulator.py
+│   │   ├── retriever.py
+│   │   └── semantic_retriever.py
 │   ├── core
-│   │   ├──  prompt_builder.py
 │   │   ├── executor.py
 │   │   ├── planner.py
+│   │   ├── prompt_builder.py
 │   │   ├── sql_generator.py
 │   │   └── validator.py
 │   ├── db
@@ -19,18 +25,20 @@
 │   │   └── schema_graph.py
 │   ├── llm
 │   │   ├── base.py
-│   │   └── gemini.py
+│   │   ├── gemini.py
+│   │   └── openrouter.py
 │   ├── main.py
 │   ├── models
 │   │   ├── context_models.py
 │   │   ├── schema_models.py
 │   │   └── semantic_models.py
 │   ├── services
-│   │   └── schema_service.py
+│   │   ├── nl2sql_service.py
+│   │   ├── schema_service.py
+│   │   └── semantic_service.py
 │   └── temporal_testing.py
 ├── arbol_proyecto.txt
 ├── dockerfile
-├── estructura.txt
 └── requirements.txt
 
-10 directories, 24 files
+11 directories, 31 files
